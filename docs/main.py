@@ -7,7 +7,7 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 # -----------------------------
-# DB
+# DATABASE
 # -----------------------------
 conn = sqlite3.connect("crm.db")
 cursor = conn.cursor()
@@ -33,35 +33,34 @@ CREATE TABLE IF NOT EXISTS purchases (
 conn.commit()
 
 # -----------------------------
-# UI
+# UI ROOT
 # -----------------------------
 root = tk.Tk()
-root.title("CRM PRO")
+root.title("CRM PRO SYSTEM")
 root.geometry("1100x750")
 root.configure(bg="#1e1e2f")
 
 # -----------------------------
-# COLORS
+# STYLE (DARK THEME FIX)
 # -----------------------------
-BG = "#1e1e2f"
-PANEL = "#2b2b40"
-ACCENT = "#4e9af1"
-TEXT = "white"
+style = ttk.Style()
+style.theme_use("clam")
+
+style.configure("Treeview",
+    background="#2b2b40",
+    fieldbackground="#2b2b40",
+    foreground="white",
+    rowheight=28
+)
+
+style.configure("Treeview.Heading",
+    background="#4e9af1",
+    foreground="white",
+    font=("Arial", 10, "bold")
+)
 
 # -----------------------------
-# SIDEBAR
-# -----------------------------
-sidebar = tk.Frame(root, bg=PANEL, width=200)
-sidebar.pack(side="left", fill="y")
-
-content = tk.Frame(root, bg=BG)
-content.pack(side="right", fill="both", expand=True)
-
-tk.Label(sidebar, text="CRM PRO", bg=PANEL, fg=TEXT,
-         font=("Arial", 16, "bold")).pack(pady=20)
-
-# -----------------------------
-# DB FUNCTIONS
+# FUNCTIONS
 # -----------------------------
 def load_clients():
     for i in tree.get_children():
@@ -93,12 +92,14 @@ def load_analytics():
 def add_client():
     name = e_name.get()
 
-    if not name:
-        messagebox.showerror("Ошибка", "Имя обязательно")
+    if not name or name == "Имя":
+        messagebox.showerror("Ошибка", "Введите имя")
         return
 
-    cursor.execute("INSERT INTO clients(name,phone,email) VALUES(?,?,?)",
-                   (name, e_phone.get(), e_email.get()))
+    cursor.execute(
+        "INSERT INTO clients(name,phone,email) VALUES(?,?,?)",
+        (name, e_phone.get(), e_email.get())
+    )
     conn.commit()
 
     e_name.delete(0, tk.END)
@@ -110,6 +111,7 @@ def add_client():
 def delete_client():
     sel = tree.selection()
     if not sel:
+        messagebox.showerror("Ошибка", "Выбери клиента")
         return
 
     cid = tree.item(sel[0])["values"][0]
@@ -154,6 +156,7 @@ def show_graph():
 
     data = cursor.fetchall()
     if not data:
+        messagebox.showerror("Ошибка", "Нет данных")
         return
 
     x = [i[0] for i in data]
@@ -162,27 +165,9 @@ def show_graph():
     plt.figure(figsize=(9,4))
     plt.plot(x, y, marker="o")
     plt.xticks(rotation=45)
-    plt.title("Revenue")
+    plt.title("Доход")
     plt.tight_layout()
     plt.show()
-
-# -----------------------------
-# KPI CARDS
-# -----------------------------
-kpi_frame = tk.Frame(content, bg=BG)
-kpi_frame.pack(pady=10)
-
-kpi_clients = tk.Label(kpi_frame, text="Клиенты: 0",
-                        bg=ACCENT, fg="white",
-                        font=("Arial", 12, "bold"),
-                        width=20)
-kpi_clients.pack(side="left", padx=10)
-
-kpi_money = tk.Label(kpi_frame, text="Доход: 0",
-                     bg="#27ae60", fg="white",
-                     font=("Arial", 12, "bold"),
-                     width=20)
-kpi_money.pack(side="left", padx=10)
 
 def update_kpi():
     cursor.execute("SELECT COUNT(*) FROM clients")
@@ -195,9 +180,43 @@ def update_kpi():
     kpi_money.config(text=f"Доход: {money}")
 
 # -----------------------------
+# MAIN LAYOUT
+# -----------------------------
+content = tk.Frame(root, bg="#1e1e2f")
+content.pack(fill="both", expand=True)
+
+# -----------------------------
+# KPI CARDS
+# -----------------------------
+kpi_frame = tk.Frame(content, bg="#1e1e2f")
+kpi_frame.pack(pady=15)
+
+kpi_clients = tk.Label(
+    kpi_frame,
+    text="Клиенты: 0",
+    bg="#4e9af1",
+    fg="white",
+    font=("Arial", 14, "bold"),
+    padx=20,
+    pady=15
+)
+kpi_clients.pack(side="left", padx=10)
+
+kpi_money = tk.Label(
+    kpi_frame,
+    text="Доход: 0",
+    bg="#27ae60",
+    fg="white",
+    font=("Arial", 14, "bold"),
+    padx=20,
+    pady=15
+)
+kpi_money.pack(side="left", padx=10)
+
+# -----------------------------
 # FORM
 # -----------------------------
-form = tk.Frame(content, bg=BG)
+form = tk.Frame(content, bg="#1e1e2f")
 form.pack(pady=10)
 
 e_name = tk.Entry(form, width=15)
@@ -213,11 +232,11 @@ e_phone.grid(row=0, column=1, padx=5)
 e_email.grid(row=0, column=2, padx=5)
 
 tk.Button(form, text="Добавить клиента",
-          bg=ACCENT, fg="white",
+          bg="#4e9af1", fg="white",
           command=add_client).grid(row=0, column=3, padx=5)
 
 # -----------------------------
-# TABLES
+# CLIENT TABLE
 # -----------------------------
 columns = ("ID", "Имя", "Телефон", "Email")
 tree = ttk.Treeview(content, columns=columns, show="headings", height=8)
@@ -230,12 +249,12 @@ tree.pack(pady=10)
 
 tk.Button(content, text="Удалить клиента",
           bg="red", fg="white",
-          command=delete_client).pack()
+          command=delete_client).pack(pady=5)
 
 # -----------------------------
 # PURCHASES
 # -----------------------------
-p_frame = tk.Frame(content, bg=BG)
+p_frame = tk.Frame(content, bg="#1e1e2f")
 p_frame.pack(pady=10)
 
 e_amount = tk.Entry(p_frame, width=20)
@@ -252,8 +271,10 @@ tk.Button(p_frame, text="График",
 # -----------------------------
 # ANALYTICS
 # -----------------------------
-tk.Label(content, text="ТОП КЛИЕНТОВ",
-         bg=BG, fg="white",
+tk.Label(content,
+         text="ТОП КЛИЕНТОВ",
+         bg="#1e1e2f",
+         fg="white",
          font=("Arial", 14, "bold")).pack()
 
 columns2 = ("Клиент", "Сумма")
@@ -266,7 +287,7 @@ for c in columns2:
 tree_stats.pack()
 
 # -----------------------------
-# START
+# INIT
 # -----------------------------
 load_clients()
 
