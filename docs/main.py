@@ -50,7 +50,7 @@ def delete_client():
     selected_item = tree.selection()
 
     if not selected_item:
-        messagebox.showerror("Ошибка", "Выбери клиента в таблице")
+        messagebox.showerror("Ошибка", "Выбери клиента")
         return
 
     item = tree.item(selected_item[0])
@@ -71,12 +71,32 @@ def load_clients():
         tree.insert("", tk.END, values=client)
 
 
+def search_client():
+    query = entry_search.get()
+
+    for row in tree.get_children():
+        tree.delete(row)
+
+    cursor.execute(
+        "SELECT id, name, phone, email FROM clients WHERE name LIKE ?",
+        ('%' + query + '%',)
+    )
+
+    for client in cursor.fetchall():
+        tree.insert("", tk.END, values=client)
+
+
+def show_all():
+    entry_search.delete(0, tk.END)
+    load_clients()
+
+
 # -----------------------------
 # UI
 # -----------------------------
 root = tk.Tk()
 root.title("CRM система")
-root.geometry("750x500")
+root.geometry("800x550")
 
 
 # ===== ФОРМА =====
@@ -103,6 +123,19 @@ tk.Button(root, text="Удалить выбранного клиента", comma
           bg="red", fg="white").pack(pady=5)
 
 
+# ===== ПОИСК =====
+frame_search = tk.Frame(root)
+frame_search.pack(pady=10)
+
+tk.Label(frame_search, text="Поиск по имени").pack(side="left")
+
+entry_search = tk.Entry(frame_search)
+entry_search.pack(side="left", padx=5)
+
+tk.Button(frame_search, text="Найти", command=search_client).pack(side="left", padx=5)
+tk.Button(frame_search, text="Показать всех", command=show_all).pack(side="left", padx=5)
+
+
 # ===== ТАБЛИЦА =====
 frame_table = tk.Frame(root)
 frame_table.pack(fill="both", expand=True)
@@ -122,7 +155,6 @@ scrollbar.pack(side="right", fill="y")
 tree.pack(fill="both", expand=True)
 
 
-# загрузка данных
 load_clients()
 
 root.mainloop()
