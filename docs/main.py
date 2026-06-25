@@ -7,7 +7,7 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 # -----------------------------
-# DATABASE
+# DB
 # -----------------------------
 conn = sqlite3.connect("crm.db")
 cursor = conn.cursor()
@@ -33,67 +33,54 @@ CREATE TABLE IF NOT EXISTS purchases (
 conn.commit()
 
 # -----------------------------
-# UI ROOT
+# UI
 # -----------------------------
 root = tk.Tk()
-root.title("CRM PRO SYSTEM")
-root.geometry("1000x700")
-root.configure(bg="#f2f4f8")
+root.title("CRM PRO")
+root.geometry("1100x750")
+root.configure(bg="#1e1e2f")
 
 # -----------------------------
-# STYLE
+# COLORS
 # -----------------------------
-style = ttk.Style()
-style.theme_use("clam")
-
-style.configure("Treeview",
-    background="#ffffff",
-    fieldbackground="#ffffff",
-    rowheight=28,
-    font=("Arial", 10)
-)
-
-style.configure("Treeview.Heading",
-    font=("Arial", 11, "bold"),
-    background="#34495e",
-    foreground="white"
-)
+BG = "#1e1e2f"
+PANEL = "#2b2b40"
+ACCENT = "#4e9af1"
+TEXT = "white"
 
 # -----------------------------
-# BUTTON STYLE
+# SIDEBAR
 # -----------------------------
-def make_button(parent, text, cmd, color):
-    return tk.Button(
-        parent,
-        text=text,
-        command=cmd,
-        bg=color,
-        fg="white",
-        activebackground="#222",
-        font=("Arial", 10, "bold"),
-        padx=10,
-        pady=5,
-        border=0
-    )
+sidebar = tk.Frame(root, bg=PANEL, width=200)
+sidebar.pack(side="left", fill="y")
+
+content = tk.Frame(root, bg=BG)
+content.pack(side="right", fill="both", expand=True)
+
+tk.Label(sidebar, text="CRM PRO", bg=PANEL, fg=TEXT,
+         font=("Arial", 16, "bold")).pack(pady=20)
 
 # -----------------------------
-# FUNCTIONS
+# DB FUNCTIONS
 # -----------------------------
 def load_clients():
-    for row in tree.get_children():
-        tree.delete(row)
+    for i in tree.get_children():
+        tree.delete(i)
 
     cursor.execute("SELECT * FROM clients")
-    for c in cursor.fetchall():
-        tree.insert("", tk.END, values=c)
+    for row in cursor.fetchall():
+        tree.insert("", "end", values=row)
+
+    update_kpi()
+    load_analytics()
 
 def load_analytics():
-    for row in tree_stats.get_children():
-        tree_stats.delete(row)
+    for i in tree_stats.get_children():
+        tree_stats.delete(i)
 
     cursor.execute("""
         SELECT clients.name,
-               COALESCE(SUM(purchases.amount), 0)
+               COALESCE(SUM(purchases.amount),0)
         FROM clients
         LEFT JOIN purchases ON clients.id = purchases.client_id
         GROUP BY clients.id
@@ -101,171 +88,186 @@ def load_analytics():
     """)
 
     for row in cursor.fetchall():
-        tree_stats.insert("", tk.END, values=row)
+        tree_stats.insert("", "end", values=row)
 
 def add_client():
-    name = entry_name.get()
-    phone = entry_phone.get()
-    email = entry_email.get()
+    name = e_name.get()
 
     if not name:
         messagebox.showerror("Ошибка", "Имя обязательно")
         return
 
-    cursor.execute(
-        "INSERT INTO clients (name, phone, email) VALUES (?, ?, ?)",
-        (name, phone, email)
-    )
+    cursor.execute("INSERT INTO clients(name,phone,email) VALUES(?,?,?)",
+                   (name, e_phone.get(), e_email.get()))
     conn.commit()
 
-    entry_name.delete(0, tk.END)
-    entry_phone.delete(0, tk.END)
-    entry_email.delete(0, tk.END)
+    e_name.delete(0, tk.END)
+    e_phone.delete(0, tk.END)
+    e_email.delete(0, tk.END)
 
     load_clients()
-    load_analytics()
 
 def delete_client():
-    selected = tree.selection()
-    if not selected:
-        messagebox.showerror("Ошибка", "Выбери клиента")
+    sel = tree.selection()
+    if not sel:
         return
 
-    client_id = tree.item(selected[0])["values"][0]
+    cid = tree.item(sel[0])["values"][0]
 
-    cursor.execute("DELETE FROM clients WHERE id=?", (client_id,))
-    cursor.execute("DELETE FROM purchases WHERE client_id=?", (client_id,))
+    cursor.execute("DELETE FROM clients WHERE id=?", (cid,))
+    cursor.execute("DELETE FROM purchases WHERE client_id=?", (cid,))
     conn.commit()
 
     load_clients()
-    load_analytics()
 
 def add_purchase():
-    selected = tree.selection()
-    if not selected:
+    sel = tree.selection()
+    if not sel:
         messagebox.showerror("Ошибка", "Выбери клиента")
         return
 
     try:
-        amount = float(entry_amount.get())
-    except ValueError:
+        amount = float(e_amount.get())
+    except:
         messagebox.showerror("Ошибка", "Сумма должна быть числом")
         return
 
-    client_id = tree.item(selected[0])["values"][0]
-    date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    cid = tree.item(sel[0])["values"][0]
+    date = datetime.now().strftime("%Y-%m-%d")
 
     cursor.execute(
-        "INSERT INTO purchases (client_id, amount, date) VALUES (?, ?, ?)",
-        (client_id, amount, date)
+        "INSERT INTO purchases(client_id,amount,date) VALUES(?,?,?)",
+        (cid, amount, date)
     )
     conn.commit()
 
-    entry_amount.delete(0, tk.END)
-    load_analytics()
+    e_amount.delete(0, tk.END)
+    load_clients()
 
 def show_graph():
     cursor.execute("""
-        SELECT date(date), SUM(amount)
+        SELECT date, SUM(amount)
         FROM purchases
-        GROUP BY date(date)
-        ORDER BY date(date)
+        GROUP BY date
+        ORDER BY date
     """)
 
     data = cursor.fetchall()
-
     if not data:
-        messagebox.showerror("Ошибка", "Нет данных")
         return
 
-    dates = [x[0] for x in data]
-    amounts = [x[1] for x in data]
+    x = [i[0] for i in data]
+    y = [i[1] for i in data]
 
-    plt.figure(figsize=(10,5))
-    plt.plot(dates, amounts, marker="o")
+    plt.figure(figsize=(9,4))
+    plt.plot(x, y, marker="o")
     plt.xticks(rotation=45)
-    plt.title("Доход по дням")
-    plt.xlabel("Дата")
-    plt.ylabel("Сумма")
+    plt.title("Revenue")
     plt.tight_layout()
     plt.show()
 
 # -----------------------------
-# TOP FORM
+# KPI CARDS
 # -----------------------------
-top = tk.Frame(root, bg="#f2f4f8")
-top.pack(pady=10)
+kpi_frame = tk.Frame(content, bg=BG)
+kpi_frame.pack(pady=10)
 
-tk.Label(top, text="Имя").grid(row=0, column=0)
-entry_name = tk.Entry(top)
-entry_name.grid(row=0, column=1, padx=5)
+kpi_clients = tk.Label(kpi_frame, text="Клиенты: 0",
+                        bg=ACCENT, fg="white",
+                        font=("Arial", 12, "bold"),
+                        width=20)
+kpi_clients.pack(side="left", padx=10)
 
-tk.Label(top, text="Телефон").grid(row=0, column=2)
-entry_phone = tk.Entry(top)
-entry_phone.grid(row=0, column=3, padx=5)
+kpi_money = tk.Label(kpi_frame, text="Доход: 0",
+                     bg="#27ae60", fg="white",
+                     font=("Arial", 12, "bold"),
+                     width=20)
+kpi_money.pack(side="left", padx=10)
 
-tk.Label(top, text="Email").grid(row=0, column=4)
-entry_email = tk.Entry(top)
-entry_email.grid(row=0, column=5, padx=5)
+def update_kpi():
+    cursor.execute("SELECT COUNT(*) FROM clients")
+    clients = cursor.fetchone()[0]
 
-make_button(top, "Добавить", add_client, "#2ecc71").grid(row=0, column=6, padx=5)
-make_button(top, "Удалить", delete_client, "#e74c3c").grid(row=0, column=7, padx=5)
+    cursor.execute("SELECT COALESCE(SUM(amount),0) FROM purchases")
+    money = cursor.fetchone()[0]
 
-# -----------------------------
-# MIDDLE
-# -----------------------------
-middle = tk.Frame(root, bg="#f2f4f8")
-middle.pack(fill="both", expand=True)
-
-left = tk.Frame(middle, bg="#f2f4f8")
-left.pack(side="left", fill="both", expand=True, padx=10)
-
-right = tk.Frame(middle, bg="#f2f4f8")
-right.pack(side="right", fill="both", expand=True, padx=10)
+    kpi_clients.config(text=f"Клиенты: {clients}")
+    kpi_money.config(text=f"Доход: {money}")
 
 # -----------------------------
-# CLIENT TABLE
+# FORM
+# -----------------------------
+form = tk.Frame(content, bg=BG)
+form.pack(pady=10)
+
+e_name = tk.Entry(form, width=15)
+e_phone = tk.Entry(form, width=15)
+e_email = tk.Entry(form, width=15)
+
+e_name.insert(0, "Имя")
+e_phone.insert(0, "Телефон")
+e_email.insert(0, "Email")
+
+e_name.grid(row=0, column=0, padx=5)
+e_phone.grid(row=0, column=1, padx=5)
+e_email.grid(row=0, column=2, padx=5)
+
+tk.Button(form, text="Добавить клиента",
+          bg=ACCENT, fg="white",
+          command=add_client).grid(row=0, column=3, padx=5)
+
+# -----------------------------
+# TABLES
 # -----------------------------
 columns = ("ID", "Имя", "Телефон", "Email")
-tree = ttk.Treeview(left, columns=columns, show="headings")
+tree = ttk.Treeview(content, columns=columns, show="headings", height=8)
 
 for c in columns:
     tree.heading(c, text=c)
-    tree.column(c, width=120)
+    tree.column(c, width=150)
 
-tree.pack(fill="both", expand=True)
+tree.pack(pady=10)
+
+tk.Button(content, text="Удалить клиента",
+          bg="red", fg="white",
+          command=delete_client).pack()
 
 # -----------------------------
 # PURCHASES
 # -----------------------------
-bottom = tk.Frame(root, bg="#f2f4f8")
-bottom.pack(pady=10)
+p_frame = tk.Frame(content, bg=BG)
+p_frame.pack(pady=10)
 
-tk.Label(bottom, text="Сумма покупки").pack(side="left")
-entry_amount = tk.Entry(bottom, width=15)
-entry_amount.pack(side="left", padx=5)
+e_amount = tk.Entry(p_frame, width=20)
+e_amount.pack(side="left", padx=5)
 
-make_button(bottom, "Добавить покупку", add_purchase, "#3498db").pack(side="left", padx=5)
-make_button(bottom, "График", show_graph, "#9b59b6").pack(side="left", padx=5)
+tk.Button(p_frame, text="Добавить покупку",
+          bg="#4e9af1", fg="white",
+          command=add_purchase).pack(side="left", padx=5)
+
+tk.Button(p_frame, text="График",
+          bg="#9b59b6", fg="white",
+          command=show_graph).pack(side="left", padx=5)
 
 # -----------------------------
 # ANALYTICS
 # -----------------------------
-tk.Label(right, text="ТОП КЛИЕНТОВ", font=("Arial", 14)).pack()
+tk.Label(content, text="ТОП КЛИЕНТОВ",
+         bg=BG, fg="white",
+         font=("Arial", 14, "bold")).pack()
 
 columns2 = ("Клиент", "Сумма")
-tree_stats = ttk.Treeview(right, columns=columns2, show="headings")
+tree_stats = ttk.Treeview(content, columns=columns2, show="headings", height=8)
 
 for c in columns2:
     tree_stats.heading(c, text=c)
-    tree_stats.column(c, width=150)
+    tree_stats.column(c, width=200)
 
-tree_stats.pack(fill="both", expand=True)
+tree_stats.pack()
 
 # -----------------------------
-# INIT
+# START
 # -----------------------------
 load_clients()
-load_analytics()
 
 root.mainloop()
