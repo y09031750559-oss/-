@@ -7,7 +7,7 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 # -----------------------------
-# DATABASE
+# DB
 # -----------------------------
 conn = sqlite3.connect("crm.db")
 cursor = conn.cursor()
@@ -33,15 +33,15 @@ CREATE TABLE IF NOT EXISTS purchases (
 conn.commit()
 
 # -----------------------------
-# UI ROOT
+# UI
 # -----------------------------
 root = tk.Tk()
-root.title("CRM PRO SYSTEM")
+root.title("CRM PRO SEGMENTS")
 root.geometry("1100x750")
 root.configure(bg="#1e1e2f")
 
 # -----------------------------
-# STYLE (DARK THEME FIX)
+# STYLE
 # -----------------------------
 style = ttk.Style()
 style.theme_use("clam")
@@ -79,15 +79,32 @@ def load_analytics():
 
     cursor.execute("""
         SELECT clients.name,
-               COALESCE(SUM(purchases.amount),0)
+               COALESCE(SUM(purchases.amount),0),
+               MAX(purchases.date)
         FROM clients
         LEFT JOIN purchases ON clients.id = purchases.client_id
         GROUP BY clients.id
         ORDER BY 2 DESC
     """)
 
-    for row in cursor.fetchall():
-        tree_stats.insert("", "end", values=row)
+    for name, total, last_date in cursor.fetchall():
+
+        if last_date:
+            last = datetime.strptime(last_date, "%Y-%m-%d %H:%M")
+            days = (datetime.now() - last).days
+        else:
+            days = 9999
+
+        if days >= 90:
+            status = "🔴 90+ дней (спящий клиент)"
+        elif days >= 60:
+            status = "🟠 60 дней"
+        elif days >= 30:
+            status = "🟡 30 дней"
+        else:
+            status = "🟢 активный"
+
+        tree_stats.insert("", "end", values=(name, total, status))
 
 def add_client():
     name = e_name.get()
@@ -135,7 +152,7 @@ def add_purchase():
         return
 
     cid = tree.item(sel[0])["values"][0]
-    date = datetime.now().strftime("%Y-%m-%d")
+    date = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     cursor.execute(
         "INSERT INTO purchases(client_id,amount,date) VALUES(?,?,?)",
@@ -150,7 +167,7 @@ def show_graph():
     cursor.execute("""
         SELECT date, SUM(amount)
         FROM purchases
-        GROUP BY date
+        GROUP BY date(date)
         ORDER BY date
     """)
 
@@ -165,7 +182,7 @@ def show_graph():
     plt.figure(figsize=(9,4))
     plt.plot(x, y, marker="o")
     plt.xticks(rotation=45)
-    plt.title("Доход")
+    plt.title("Доход по времени")
     plt.tight_layout()
     plt.show()
 
@@ -180,42 +197,28 @@ def update_kpi():
     kpi_money.config(text=f"Доход: {money}")
 
 # -----------------------------
-# MAIN LAYOUT
+# UI LAYOUT
 # -----------------------------
 content = tk.Frame(root, bg="#1e1e2f")
 content.pack(fill="both", expand=True)
 
-# -----------------------------
-# KPI CARDS
-# -----------------------------
+# KPI
 kpi_frame = tk.Frame(content, bg="#1e1e2f")
 kpi_frame.pack(pady=15)
 
-kpi_clients = tk.Label(
-    kpi_frame,
-    text="Клиенты: 0",
-    bg="#4e9af1",
-    fg="white",
-    font=("Arial", 14, "bold"),
-    padx=20,
-    pady=15
-)
+kpi_clients = tk.Label(kpi_frame, text="Клиенты: 0",
+                       bg="#4e9af1", fg="white",
+                       font=("Arial", 14, "bold"),
+                       padx=20, pady=15)
 kpi_clients.pack(side="left", padx=10)
 
-kpi_money = tk.Label(
-    kpi_frame,
-    text="Доход: 0",
-    bg="#27ae60",
-    fg="white",
-    font=("Arial", 14, "bold"),
-    padx=20,
-    pady=15
-)
+kpi_money = tk.Label(kpi_frame, text="Доход: 0",
+                     bg="#27ae60", fg="white",
+                     font=("Arial", 14, "bold"),
+                     padx=20, pady=15)
 kpi_money.pack(side="left", padx=10)
 
-# -----------------------------
 # FORM
-# -----------------------------
 form = tk.Frame(content, bg="#1e1e2f")
 form.pack(pady=10)
 
@@ -235,9 +238,7 @@ tk.Button(form, text="Добавить клиента",
           bg="#4e9af1", fg="white",
           command=add_client).grid(row=0, column=3, padx=5)
 
-# -----------------------------
 # CLIENT TABLE
-# -----------------------------
 columns = ("ID", "Имя", "Телефон", "Email")
 tree = ttk.Treeview(content, columns=columns, show="headings", height=8)
 
@@ -251,9 +252,7 @@ tk.Button(content, text="Удалить клиента",
           bg="red", fg="white",
           command=delete_client).pack(pady=5)
 
-# -----------------------------
 # PURCHASES
-# -----------------------------
 p_frame = tk.Frame(content, bg="#1e1e2f")
 p_frame.pack(pady=10)
 
@@ -268,16 +267,14 @@ tk.Button(p_frame, text="График",
           bg="#9b59b6", fg="white",
           command=show_graph).pack(side="left", padx=5)
 
-# -----------------------------
 # ANALYTICS
-# -----------------------------
 tk.Label(content,
-         text="ТОП КЛИЕНТОВ",
+         text="ТОП КЛИЕНТОВ (сегменты)",
          bg="#1e1e2f",
          fg="white",
          font=("Arial", 14, "bold")).pack()
 
-columns2 = ("Клиент", "Сумма")
+columns2 = ("Клиент", "Сумма", "Статус")
 tree_stats = ttk.Treeview(content, columns=columns2, show="headings", height=8)
 
 for c in columns2:
@@ -286,9 +283,6 @@ for c in columns2:
 
 tree_stats.pack()
 
-# -----------------------------
-# INIT
-# -----------------------------
+# START
 load_clients()
-
 root.mainloop()
