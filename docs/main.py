@@ -1,6 +1,7 @@
 import sqlite3
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import ttk
 
 # -----------------------------
 # БАЗА ДАННЫХ
@@ -46,46 +47,61 @@ def add_client():
 
 
 def load_clients():
-    listbox.delete(0, tk.END)
+    for row in tree.get_children():
+        tree.delete(row)
 
     cursor.execute("SELECT id, name, phone, email FROM clients")
     for client in cursor.fetchall():
-        listbox.insert(
-            tk.END,
-            f"{client[0]} | {client[1]} | {client[2]} | {client[3]}"
-        )
+        tree.insert("", tk.END, values=client)
 
 
 # -----------------------------
-# UI (ИНТЕРФЕЙС)
+# UI
 # -----------------------------
 root = tk.Tk()
 root.title("CRM система")
-root.geometry("600x400")
+root.geometry("700x450")
 
 
-# Поля ввода
-tk.Label(root, text="Имя").pack()
-entry_name = tk.Entry(root)
-entry_name.pack()
+# ===== ФОРМА =====
+frame_form = tk.Frame(root)
+frame_form.pack(pady=10)
 
-tk.Label(root, text="Телефон").pack()
-entry_phone = tk.Entry(root)
-entry_phone.pack()
+tk.Label(frame_form, text="Имя").grid(row=0, column=0)
+entry_name = tk.Entry(frame_form)
+entry_name.grid(row=0, column=1, padx=5)
 
-tk.Label(root, text="Email").pack()
-entry_email = tk.Entry(root)
-entry_email.pack()
+tk.Label(frame_form, text="Телефон").grid(row=0, column=2)
+entry_phone = tk.Entry(frame_form)
+entry_phone.grid(row=0, column=3, padx=5)
 
-tk.Button(root, text="Добавить клиента", command=add_client).pack(pady=10)
+tk.Label(frame_form, text="Email").grid(row=0, column=4)
+entry_email = tk.Entry(frame_form)
+entry_email.grid(row=0, column=5, padx=5)
 
-
-# Список клиентов
-listbox = tk.Listbox(root, width=80)
-listbox.pack(pady=10)
+tk.Button(root, text="Добавить клиента", command=add_client, bg="green", fg="white").pack(pady=10)
 
 
-# загрузка данных при старте
+# ===== ТАБЛИЦА =====
+frame_table = tk.Frame(root)
+frame_table.pack(fill="both", expand=True)
+
+columns = ("ID", "Имя", "Телефон", "Email")
+
+tree = ttk.Treeview(frame_table, columns=columns, show="headings")
+
+for col in columns:
+    tree.heading(col, text=col)
+    tree.column(col, width=150)
+
+scrollbar = ttk.Scrollbar(frame_table, orient="vertical", command=tree.yview)
+tree.configure(yscrollcommand=scrollbar.set)
+
+scrollbar.pack(side="right", fill="y")
+tree.pack(fill="both", expand=True)
+
+
+# загрузка данных
 load_clients()
 
 root.mainloop()
