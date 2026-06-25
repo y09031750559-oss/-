@@ -46,6 +46,22 @@ def add_client():
     load_clients()
 
 
+def delete_client():
+    selected_item = tree.selection()
+
+    if not selected_item:
+        messagebox.showerror("Ошибка", "Выбери клиента")
+        return
+
+    client = tree.item(selected_item)
+    client_id = client["values"][0]
+
+    cursor.execute("DELETE FROM clients WHERE id=?", (client_id,))
+    conn.commit()
+
+    load_clients()
+
+
 def load_clients():
     for row in tree.get_children():
         tree.delete(row)
@@ -60,7 +76,7 @@ def load_clients():
 # -----------------------------
 root = tk.Tk()
 root.title("CRM система")
-root.geometry("700x450")
+root.geometry("750x500")
 
 
 # ===== ФОРМА =====
@@ -79,7 +95,12 @@ tk.Label(frame_form, text="Email").grid(row=0, column=4)
 entry_email = tk.Entry(frame_form)
 entry_email.grid(row=0, column=5, padx=5)
 
-tk.Button(root, text="Добавить клиента", command=add_client, bg="green", fg="white").pack(pady=10)
+
+tk.Button(root, text="Добавить клиента", command=add_client,
+          bg="green", fg="white").pack(pady=5)
+
+tk.Button(root, text="Удалить выбранного клиента", command=delete_client,
+          bg="red", fg="white").pack(pady=5)
 
 
 # ===== ТАБЛИЦА =====
