@@ -50,11 +50,11 @@ def delete_client():
     selected_item = tree.selection()
 
     if not selected_item:
-        messagebox.showerror("Ошибка", "Выбери клиента")
+        messagebox.showerror("Ошибка", "Выбери клиента в таблице")
         return
 
-    client = tree.item(selected_item)
-    client_id = client["values"][0]
+    item = tree.item(selected_item[0])
+    client_id = item["values"][0]
 
     cursor.execute("DELETE FROM clients WHERE id=?", (client_id,))
     conn.commit()
