@@ -2,6 +2,7 @@ import sqlite3
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
+from datetime import datetime
 
 # -----------------------------
 # БАЗА ДАННЫХ
@@ -18,11 +19,20 @@ CREATE TABLE IF NOT EXISTS clients (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS purchases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER,
+    amount REAL,
+    date TEXT
+)
+""")
+
 conn.commit()
 
 
 # -----------------------------
-# ФУНКЦИИ
+# КЛИЕНТЫ
 # -----------------------------
 def add_client():
     name = entry_name.get()
@@ -47,114 +57,153 @@ def add_client():
 
 
 def delete_client():
-    selected_item = tree.selection()
-
-    if not selected_item:
+    selected = tree.selection()
+    if not selected:
         messagebox.showerror("Ошибка", "Выбери клиента")
         return
 
-    item = tree.item(selected_item[0])
-    client_id = item["values"][0]
+    client_id = tree.item(selected[0])["values"][0]
 
     cursor.execute("DELETE FROM clients WHERE id=?", (client_id,))
+    cursor.execute("DELETE FROM purchases WHERE client_id=?", (client_id,))
     conn.commit()
 
     load_clients()
+    load_analytics()
 
 
+# -----------------------------
+# ПОКУПКИ
+# -----------------------------
+def add_purchase():
+    selected = tree.selection()
+    if not selected:
+        messagebox.showerror("Ошибка", "Выбери клиента")
+        return
+
+    amount = entry_amount.get()
+    if not amount:
+        messagebox.showerror("Ошибка", "Введите сумму")
+        return
+
+    client_id = tree.item(selected[0])["values"][0]
+    date = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    cursor.execute(
+        "INSERT INTO purchases (client_id, amount, date) VALUES (?, ?, ?)",
+        (client_id, amount, date)
+    )
+    conn.commit()
+
+    entry_amount.delete(0, tk.END)
+
+    load_analytics()
+
+
+# -----------------------------
+# КЛИЕНТЫ
+# -----------------------------
 def load_clients():
     for row in tree.get_children():
         tree.delete(row)
 
-    cursor.execute("SELECT id, name, phone, email FROM clients")
-    for client in cursor.fetchall():
-        tree.insert("", tk.END, values=client)
+    cursor.execute("SELECT * FROM clients")
+    for c in cursor.fetchall():
+        tree.insert("", tk.END, values=c)
 
 
-def search_client():
-    query = entry_search.get()
+# -----------------------------
+# АНАЛИТИКА (ГЛАВНОЕ)
+# -----------------------------
+def load_analytics():
+    for row in tree_stats.get_children():
+        tree_stats.delete(row)
 
-    for row in tree.get_children():
-        tree.delete(row)
+    cursor.execute("""
+        SELECT clients.name,
+               IFNULL(SUM(purchases.amount), 0) as total
+        FROM clients
+        LEFT JOIN purchases ON clients.id = purchases.client_id
+        GROUP BY clients.id
+        ORDER BY total DESC
+    """)
 
-    cursor.execute(
-        "SELECT id, name, phone, email FROM clients WHERE name LIKE ?",
-        ('%' + query + '%',)
-    )
-
-    for client in cursor.fetchall():
-        tree.insert("", tk.END, values=client)
-
-
-def show_all():
-    entry_search.delete(0, tk.END)
-    load_clients()
+    for row in cursor.fetchall():
+        tree_stats.insert("", tk.END, values=row)
 
 
 # -----------------------------
 # UI
 # -----------------------------
 root = tk.Tk()
-root.title("CRM система")
-root.geometry("800x550")
+root.title("CRM ANALYTICS LEVEL")
+root.geometry("900x650")
 
 
 # ===== ФОРМА =====
-frame_form = tk.Frame(root)
-frame_form.pack(pady=10)
+frame = tk.Frame(root)
+frame.pack(pady=10)
 
-tk.Label(frame_form, text="Имя").grid(row=0, column=0)
-entry_name = tk.Entry(frame_form)
-entry_name.grid(row=0, column=1, padx=5)
+tk.Label(frame, text="Имя").grid(row=0, column=0)
+entry_name = tk.Entry(frame)
+entry_name.grid(row=0, column=1)
 
-tk.Label(frame_form, text="Телефон").grid(row=0, column=2)
-entry_phone = tk.Entry(frame_form)
-entry_phone.grid(row=0, column=3, padx=5)
+tk.Label(frame, text="Телефон").grid(row=0, column=2)
+entry_phone = tk.Entry(frame)
+entry_phone.grid(row=0, column=3)
 
-tk.Label(frame_form, text="Email").grid(row=0, column=4)
-entry_email = tk.Entry(frame_form)
-entry_email.grid(row=0, column=5, padx=5)
+tk.Label(frame, text="Email").grid(row=0, column=4)
+entry_email = tk.Entry(frame)
+entry_email.grid(row=0, column=5)
 
 
 tk.Button(root, text="Добавить клиента", command=add_client,
           bg="green", fg="white").pack(pady=5)
 
-tk.Button(root, text="Удалить выбранного клиента", command=delete_client,
+tk.Button(root, text="Удалить клиента", command=delete_client,
           bg="red", fg="white").pack(pady=5)
 
 
-# ===== ПОИСК =====
-frame_search = tk.Frame(root)
-frame_search.pack(pady=10)
-
-tk.Label(frame_search, text="Поиск по имени").pack(side="left")
-
-entry_search = tk.Entry(frame_search)
-entry_search.pack(side="left", padx=5)
-
-tk.Button(frame_search, text="Найти", command=search_client).pack(side="left", padx=5)
-tk.Button(frame_search, text="Показать всех", command=show_all).pack(side="left", padx=5)
-
-
-# ===== ТАБЛИЦА =====
-frame_table = tk.Frame(root)
-frame_table.pack(fill="both", expand=True)
-
+# ===== КЛИЕНТЫ =====
 columns = ("ID", "Имя", "Телефон", "Email")
+tree = ttk.Treeview(root, columns=columns, show="headings")
 
-tree = ttk.Treeview(frame_table, columns=columns, show="headings")
+for c in columns:
+    tree.heading(c, text=c)
+    tree.column(c, width=150)
 
-for col in columns:
-    tree.heading(col, text=col)
-    tree.column(col, width=150)
-
-scrollbar = ttk.Scrollbar(frame_table, orient="vertical", command=tree.yview)
-tree.configure(yscrollcommand=scrollbar.set)
-
-scrollbar.pack(side="right", fill="y")
-tree.pack(fill="both", expand=True)
+tree.pack(fill="x")
 
 
+# ===== ПОКУПКИ =====
+frame2 = tk.Frame(root)
+frame2.pack(pady=10)
+
+tk.Label(frame2, text="Сумма покупки").pack(side="left")
+entry_amount = tk.Entry(frame2)
+entry_amount.pack(side="left", padx=5)
+
+tk.Button(frame2, text="Добавить покупку",
+          command=add_purchase,
+          bg="blue", fg="white").pack(side="left")
+
+
+# ===== АНАЛИТИКА =====
+tk.Label(root, text="📊 ТОП КЛИЕНТОВ", font=("Arial", 14)).pack()
+
+columns2 = ("Клиент", "Сумма покупок")
+
+tree_stats = ttk.Treeview(root, columns=columns2, show="headings")
+
+for c in columns2:
+    tree_stats.heading(c, text=c)
+    tree_stats.column(c, width=200)
+
+tree_stats.pack(fill="both", expand=True)
+
+
+# загрузка данных
 load_clients()
+load_analytics()
 
 root.mainloop()
