@@ -32,6 +32,9 @@ def download():
         url = api("/storage/url", {"path": order["result"]["files"][0]})["url"]
         urllib.request.urlretrieve(url, f"dl/{name}.mp3")
         print("downloaded", name)
+        if name == "voice":
+            srt = next(p for p in order["result"]["service_files"] if p.endswith(".srt"))
+            urllib.request.urlretrieve(api("/storage/url", {"path": srt})["url"], "dl/voice.srt")
 
 
 def run(cmd):
@@ -42,8 +45,29 @@ def duration(f):
     return float(run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).stdout)
 
 
+CARD_STARTS = ["Seventeen encounters", "Number one", "Number four", "Number nine",
+               "Number thirteen", "Number seventeen", "So if you hear", "keep walking"]
+
+
+def srt_cut_points(srt):
+    """Card boundaries = middle of the gap before each subtitle that opens a card."""
+    ts = lambda s: sum(float(x) * m for x, m in zip(s.replace(",", ".").split(":"), (3600, 60, 1)))
+    subs = []
+    for block in open(srt, encoding="utf-8").read().strip().split("\n\n"):
+        lines = block.splitlines()
+        a, b = lines[1].split(" --> ")
+        subs.append((ts(a), ts(b), " ".join(lines[2:])))
+    mids = []
+    for key in CARD_STARTS:
+        k = next(i for i, s in enumerate(subs) if s[2].startswith(key))
+        mids.append((subs[k - 1][1] + subs[k][0]) / 2)
+    return mids
+
+
 def cut_points(voice, total):
-    """Card boundaries = middles of the N_CARDS-1 longest pauses in the voice."""
+    """Card boundaries from the TTS subtitles, else the N_CARDS-1 longest pauses in the voice."""
+    if os.path.exists("dl/voice.srt"):
+        return srt_cut_points("dl/voice.srt")
     err = run(["ffmpeg", "-i", voice, "-af", "silencedetect=n=-38dB:d=0.35", "-f", "null", "-"]).stderr
     st = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", err)]
     en = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", err)]
@@ -73,7 +97,7 @@ def main():
         inputs += ["-loop", "1", "-framerate", str(FPS), "-t", f"{d:.3f}", "-i", f"frames/{i:02d}.png"]
         chains.append(
             f"[{i}:v]scale=2304:1296,zoompan=z='1+0.06*on/{n}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2'"
-            f":d=1:s=1920x1080:fps={FPS},noise=alls=14:allf=t,"
+            f":d=1:s=1920x1080:fps={FPS},noise=alls=8:allf=t,"
             f"eq=brightness='-0.03+0.025*sin(t*23)*sin(t*7)',"
             f"fade=in:st=0:d=0.35,fade=out:st={max(d - 0.3, 0):.3f}:d=0.3,setsar=1[v{i}]")
     vcat = "".join(f"[v{i}]" for i in range(N_CARDS)) + f"concat=n={N_CARDS}:v=1:a=0[vout]"
@@ -107,7 +131,7 @@ def main():
 
     fc = ";".join(chains + [vcat] + a)
     cmd = ["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", fc,
-           "-map", "[vout]", "-map", "[aout]", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+           "-map", "[vout]", "-map", "[aout]", "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-maxrate", "8M", "-bufsize", "16M",
            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
            "-movflags", "+faststart", "-t", f"{total:.3f}", out]
     subprocess.run(cmd, check=True)
