@@ -1,0 +1,8 @@
+Never answer the voice in the woods. {{pause=0.8}}
+Seventeen encounters. Seventeen people who answered anyway. {{pause=1}}
+Number one. {{pause=0.4}} A hiker hears his wife calling from the treeline. She is standing right beside him. {{pause=1}}
+Number four. {{pause=0.4}} A child says her mother's voice sings outside the window, every night at three. Her mother sleeps beside her. {{pause=1}}
+Number nine. {{pause=0.4}} A ranger follows a cry for help for two miles. It repeats his own words, a second behind. {{pause=1}}
+Number thirteen. {{pause=0.4}} The voice knows your name. {{pause=0.3}} It knows your dog's name. {{pause=0.3}} It knows what you said at dinner. {{pause=1}}
+Number seventeen. {{pause=0.4}} He answered once. {{pause=0.6}} Now it answers back, from inside the house. {{pause=1.2}}
+So if you hear your name tonight, in the dark, in the trees... {{pause=0.8}} keep walking. {{pause=0.6}} Never answer the voice in the woods.
