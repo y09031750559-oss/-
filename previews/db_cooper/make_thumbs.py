@@ -220,9 +220,7 @@ def t1():
     a = vignette(a, 0.55, cx=0.6)
     a = grain(a, 0.028)
     im = img(a)
-    text(im, (56, 360), "HE NEVER", 120)
-    text(im, (56, 505), "LANDED.", 120, fill=YEL)
-    credit(im, "727 N467US, 1972: Clint Groves, CC BY-SA 4.0 · Lake Merwin, WA: Ryan Harvey, CC BY-SA 2.0")
+    text(im, (60, 440), "GONE.", 210, fill=YEL)
     return im
 
 
@@ -247,11 +245,7 @@ def t2():
     a = vignette(a, 0.5, cx=0.72)
     a = grain(a, 0.04, size=1.3)
     im = img(a)
-    text(im, (60, 120), "WHO", 160)
-    text(im, (60, 300), "WAS HE?", 160, fill=YEL)
-    C, A = stamp("UNSOLVED", 66, angle=-7)
-    im.paste(C, (60, 535), A)
-    credit(im, "FBI composite sketch, 1971")
+    text(im, (70, 220), "WHO?", 240, fill=YEL)
     return im
 
 
@@ -272,10 +266,7 @@ def t3():
     a = spot(a, 380, 400, 720, 560, floor=0.10)
     a = grain(a, 0.03)
     im = img(a)
-    text(im, (W - 46, 40), "$5,800", 170, fill=YEL, anchor="ra")
-    text(im, (W - 46, 245), "FOUND.", 130, anchor="ra")
-    text(im, (W - 46, 430), "HE WASN'T.", 96, anchor="ra")
-    credit(im, "Ransom bills found on the Columbia River, 1980 · FBI photo")
+    text(im, (W - 50, 230), "$5,800", 210, fill=YEL, anchor="ra")
     return im
 
 
@@ -299,8 +290,7 @@ def t4():
     a = vignette(a, 0.5)
     a = grain(a, 0.035, size=1.4)
     im = img(a)
-    text(im, (W - 50, 30), "THE BACK", 112, anchor="ra")
-    text(im, (W - 50, 160), "DOOR.", 112, fill=YEL, anchor="ra")
+    text(im, (W - 50, 40), "JUMPED.", 150, fill=YEL, anchor="ra")
     d = ImageDraw.Draw(im)
     tip = (sx + 40, sy - 60)
     tail = (tip[0] + 250, tip[1] - 150)
@@ -308,7 +298,6 @@ def t4():
     v = np.array(tip) - np.array(tail); v = v / np.linalg.norm(v); n = np.array([-v[1], v[0]])
     t = np.array(tip)
     d.polygon([tuple(t), tuple(t - v * 60 + n * 30), tuple(t - v * 60 - n * 30)], fill=YEL)
-    credit(im, "Northwest 727 aft airstair, 1975 · photo: R. W. Rynerson, CC BY 2.0")
     return im
 
 
@@ -335,9 +324,7 @@ def t5():
     im = img(a)
     C, A = stamp("UNSOLVED", 96, angle=-14)
     im.paste(C, (700, 420), A)
-    text(im, (60, 110), "55 YEARS.", 140)
-    text(im, (60, 290), "NO NAME.", 140, fill=YEL)
-    credit(im, "FBI wanted bulletin, 1971")
+    text(im, (60, 250), "55 YEARS", 170, fill=YEL)
     return im
 
 
