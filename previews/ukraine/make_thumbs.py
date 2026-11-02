@@ -14,7 +14,7 @@ RED = (230, 30, 30)
 
 def font(size):
     f = ImageFont.truetype(MONT, size)
-    f.set_variation_by_name("Black")
+    f.set_variation_by_name("ExtraBold")
     return f
 
 
