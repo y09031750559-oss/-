@@ -42,98 +42,39 @@ namespace AccessMasterDetail
     {
         public const string RelationName = "FK_Clients_Orders";
 
-        // Драйверы Access по порядку: ACE из Office (.accdb), затем встроенный в Windows Jet (.mdb).
+        // Драйверы Access: ACE из Office или встроенный в Windows Jet 4.0.
         private static readonly string[] Providers =
             { "Microsoft.ACE.OLEDB.16.0", "Microsoft.ACE.OLEDB.12.0", "Microsoft.Jet.OLEDB.4.0" };
 
         private static string Provider = Providers[0];
-        private static bool IsJet => Provider.StartsWith("Microsoft.Jet");
 
-        public static string DbPath => Path.Combine(AppContext.BaseDirectory, IsJet ? "Shop.mdb" : "Shop.accdb");
+        // База Access (формат .mdb, открывается в Access). Готовый файл вшит в программу.
+        public static readonly string DbPath = Path.Combine(AppContext.BaseDirectory, "Shop.mdb");
 
-        public static string ConnectionString =>
-            $"Provider={Provider};Data Source={DbPath}" + (IsJet ? ";Jet OLEDB:Engine Type=5" : "");
+        public static string ConnectionString => $"Provider={Provider};Data Source={DbPath}";
 
-        /// <summary>Находит рабочий драйвер и открывает (или создаёт) базу.</summary>
+        /// <summary>Выкладывает файл базы рядом с программой (если его нет) и подбирает рабочий драйвер.</summary>
         public static void EnsureDatabase()
         {
-            var errors = new System.Text.StringBuilder();
+            if (!File.Exists(DbPath))
+            {
+                using (var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("Shop.mdb"))
+                using (var file = File.Create(DbPath))
+                    res.CopyTo(file);
+            }
 
-            // 1. Если база уже есть — ищем драйвер, который её открывает.
+            var errors = new System.Text.StringBuilder();
             foreach (var p in Providers)
             {
                 Provider = p;
-                if (!File.Exists(DbPath)) continue;
                 try
                 {
                     using (var c = new OleDbConnection(ConnectionString)) c.Open();
                     return;
                 }
-                catch (Exception ex) { errors.AppendLine(p + ": " + Inner(ex).Message); }
+                catch (Exception ex) { errors.AppendLine(p + ": " + ex.Message); }
             }
-
-            // 2. Иначе создаём новую базу первым драйвером, который сработает.
-            foreach (var p in Providers)
-            {
-                Provider = p;
-                if (File.Exists(DbPath)) continue;
-                try
-                {
-                    CreateDatabase();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    errors.AppendLine(p + ": " + Inner(ex).Message);
-                    try { if (File.Exists(DbPath)) File.Delete(DbPath); } catch { }
-                }
-            }
-            throw new InvalidOperationException(errors.ToString() +
-                "\nНужен 64-битный Microsoft Access Database Engine 2016 (accessdatabaseengine_X64.exe).");
-        }
-
-        private static Exception Inner(Exception ex)
-        {
-            while (ex.InnerException != null) ex = ex.InnerException;
-            return ex;
-        }
-
-        private static void CreateDatabase()
-        {
-            // Пустой файл базы создаём через ADOX (COM), таблицы — через SQL DDL.
-            Type catalogType = Type.GetTypeFromProgID("ADOX.Catalog")
-                ?? throw new InvalidOperationException("ADOX.Catalog не найден.");
-            object catalog = Activator.CreateInstance(catalogType);
-            object conn = catalogType.InvokeMember("Create", BindingFlags.InvokeMethod, null, catalog,
-                new object[] { ConnectionString });
-            conn.GetType().InvokeMember("Close", BindingFlags.InvokeMethod, null, conn, null);
-            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(conn);
-            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(catalog);
-
-            using var c = new OleDbConnection(ConnectionString);
-            c.Open();
-            Exec(c, @"CREATE TABLE Clients (
-                        ID COUNTER PRIMARY KEY,
-                        FullName TEXT(100) NOT NULL,
-                        Phone TEXT(30),
-                        City TEXT(50))");
-            Exec(c, @"CREATE TABLE Orders (
-                        ID COUNTER PRIMARY KEY,
-                        ClientID INTEGER NOT NULL,
-                        OrderDate DATETIME,
-                        Product TEXT(100),
-                        Quantity INTEGER,
-                        Price CURRENCY,
-                        CONSTRAINT FK_Orders_Clients FOREIGN KEY (ClientID) REFERENCES Clients (ID))");
-
-            Exec(c, "INSERT INTO Clients (FullName, Phone, City) VALUES ('Иванов Иван', '+7 900 111-11-11', 'Москва')");
-            Exec(c, "INSERT INTO Clients (FullName, Phone, City) VALUES ('Петров Пётр', '+7 900 222-22-22', 'Казань')");
-            Exec(c, "INSERT INTO Clients (FullName, Phone, City) VALUES ('Сидорова Анна', '+7 900 333-33-33', 'Самара')");
-
-            Exec(c, "INSERT INTO Orders (ClientID, OrderDate, Product, Quantity, Price) VALUES (1, #2026-10-01#, 'Ноутбук', 1, 65000)");
-            Exec(c, "INSERT INTO Orders (ClientID, OrderDate, Product, Quantity, Price) VALUES (1, #2026-10-05#, 'Мышь', 2, 900)");
-            Exec(c, "INSERT INTO Orders (ClientID, OrderDate, Product, Quantity, Price) VALUES (2, #2026-10-10#, 'Монитор', 1, 18000)");
-            Exec(c, "INSERT INTO Orders (ClientID, OrderDate, Product, Quantity, Price) VALUES (3, #2026-10-12#, 'Клавиатура', 1, 2500)");
+            throw new InvalidOperationException(errors.ToString());
         }
 
         private static void Exec(OleDbConnection c, string sql)
