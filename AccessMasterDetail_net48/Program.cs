@@ -52,8 +52,7 @@ namespace AccessMasterDetail
         public static string DbPath => Path.Combine(AppContext.BaseDirectory, IsJet ? "Shop.mdb" : "Shop.accdb");
 
         public static string ConnectionString =>
-            $"Provider={Provider};Data Source={DbPath};Persist Security Info=False;" +
-            (IsJet ? "Jet OLEDB:Engine Type=5;" : "");
+            $"Provider={Provider};Data Source={DbPath}" + (IsJet ? ";Jet OLEDB:Engine Type=5" : "");
 
         /// <summary>Находит рабочий драйвер и открывает (или создаёт) базу.</summary>
         public static void EnsureDatabase()
@@ -89,7 +88,8 @@ namespace AccessMasterDetail
                     try { if (File.Exists(DbPath)) File.Delete(DbPath); } catch { }
                 }
             }
-            throw new InvalidOperationException(errors.ToString());
+            throw new InvalidOperationException(errors.ToString() +
+                "\nНужен 64-битный Microsoft Access Database Engine 2016 (accessdatabaseengine_X64.exe).");
         }
 
         private static Exception Inner(Exception ex)
