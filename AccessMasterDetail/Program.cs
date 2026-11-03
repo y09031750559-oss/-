@@ -1,23 +1,33 @@
-namespace AccessMasterDetail;
+﻿using System;
+using System.Data;
+using System.Data.OleDb;
+using System.Drawing;
+using System.IO;
+using System.Reflection;
+using System.Windows.Forms;
 
-internal static class Program
+namespace AccessMasterDetail
 {
-    [STAThread]
-    private static void Main()
+    internal static class Program
     {
-        ApplicationConfiguration.Initialize();
-        try
+        [STAThread]
+        private static void Main()
         {
-            Db.EnsureDatabase();
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            try
+            {
+                Db.EnsureDatabase();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Не удалось открыть/создать базу Access.\n\n" + ex.Message,
+                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            Application.Run(new MainForm());
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                "Не удалось открыть/создать базу Access.\n\n" + ex.Message +
-                "\n\nУстановите Microsoft Access Database Engine (той же разрядности, что и PlatformTarget в .csproj).",
-                "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
-        }
-        Application.Run(new MainForm());
     }
 }
