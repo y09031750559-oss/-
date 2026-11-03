@@ -20,14 +20,14 @@ namespace AccessMasterDetail
             {
                 Db.EnsureDatabase();
             }
-            catch (Exception ex)
+            catch
             {
-                MessageBox.Show(
-                    "Не удалось открыть/создать базу Access.\n\n" + ex.Message,
-                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                // Драйвер Access недоступен — работаем в резервном режиме (данные в Shop.xml)
+                Db.Offline = true;
             }
-            Application.Run(new MainForm());
+            var form = new MainForm();
+            if (Db.Offline) form.Text += " — резервный режим (Shop.xml)";
+            Application.Run(form);
         }
     }
 }

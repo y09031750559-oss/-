@@ -58,11 +58,14 @@ namespace AccessMasterDetail
         public static DataSet Load()
         {
             var ds = new DataSet("Shop");
-            using (var c = new OleDbConnection(ConnectionString))
-            {
-                Fill(c, ds, "Clients");
-                Fill(c, ds, "Orders");
-            }
+            if (Offline)
+                LoadOffline(ds);
+            else
+                using (var c = new OleDbConnection(ConnectionString))
+                {
+                    Fill(c, ds, "Clients");
+                    Fill(c, ds, "Orders");
+                }
 
             var clients = ds.Tables["Clients"];
             var orders = ds.Tables["Orders"];
@@ -72,8 +75,8 @@ namespace AccessMasterDetail
             {
                 var id = t.Columns["ID"];
                 id.AutoIncrement = true;
-                id.AutoIncrementSeed = -1;
-                id.AutoIncrementStep = -1;
+                id.AutoIncrementSeed = Offline ? NextId(t) : -1;
+                id.AutoIncrementStep = Offline ? 1 : -1;
                 id.ReadOnly = false; // чтобы после сохранения можно было записать настоящий ID
             }
 
@@ -86,6 +89,50 @@ namespace AccessMasterDetail
             return ds;
         }
 
+        /// <summary>Резервный режим: если драйвер Access недоступен, данные хранятся в Shop.xml.</summary>
+        public static bool Offline;
+        public static readonly string XmlPath = Path.Combine(AppContext.BaseDirectory, "Shop.xml");
+
+        private static int NextId(DataTable t)
+        {
+            int max = 0;
+            foreach (DataRow r in t.Rows) if (r["ID"] is int i && i > max) max = i;
+            return max + 1;
+        }
+
+        private static void LoadOffline(DataSet ds)
+        {
+            var clients = ds.Tables.Add("Clients");
+            clients.Columns.Add("ID", typeof(int));
+            clients.Columns.Add("FullName", typeof(string));
+            clients.Columns.Add("Phone", typeof(string));
+            clients.Columns.Add("City", typeof(string));
+            clients.PrimaryKey = new[] { clients.Columns["ID"] };
+
+            var orders = ds.Tables.Add("Orders");
+            orders.Columns.Add("ID", typeof(int));
+            orders.Columns.Add("ClientID", typeof(int));
+            orders.Columns.Add("OrderDate", typeof(DateTime));
+            orders.Columns.Add("Product", typeof(string));
+            orders.Columns.Add("Quantity", typeof(int));
+            orders.Columns.Add("Price", typeof(decimal));
+            orders.PrimaryKey = new[] { orders.Columns["ID"] };
+
+            if (File.Exists(XmlPath))
+            {
+                try { ds.ReadXml(XmlPath, XmlReadMode.IgnoreSchema); ds.AcceptChanges(); return; }
+                catch { ds.Clear(); }
+            }
+            clients.Rows.Add(1, "Иванов Иван", "+7 900 111-11-11", "Москва");
+            clients.Rows.Add(2, "Петров Пётр", "+7 900 222-22-22", "Казань");
+            clients.Rows.Add(3, "Сидорова Анна", "+7 900 333-33-33", "Самара");
+            orders.Rows.Add(1, 1, new DateTime(2026, 10, 1), "Ноутбук", 1, 65000m);
+            orders.Rows.Add(2, 1, new DateTime(2026, 10, 5), "Мышь", 2, 900m);
+            orders.Rows.Add(3, 2, new DateTime(2026, 10, 10), "Монитор", 1, 18000m);
+            orders.Rows.Add(4, 3, new DateTime(2026, 10, 12), "Клавиатура", 1, 2500m);
+            ds.AcceptChanges();
+        }
+
         private static void Fill(OleDbConnection c, DataSet ds, string table)
         {
             using var da = new OleDbDataAdapter($"SELECT * FROM [{table}]", c);
@@ -96,6 +143,12 @@ namespace AccessMasterDetail
         /// <summary>Сохраняет изменения в правильном порядке (сначала главная, потом подчинённая).</summary>
         public static void Save(DataSet ds)
         {
+            if (Offline)
+            {
+                ds.WriteXml(XmlPath);
+                return;
+            }
+
             var clients = ds.Tables["Clients"];
             var orders = ds.Tables["Orders"];
 
