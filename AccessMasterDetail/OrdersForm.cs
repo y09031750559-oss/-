@@ -32,6 +32,9 @@ namespace AccessMasterDetail
             TextAlign = ContentAlignment.MiddleRight
         };
 
+        private readonly TextBox _productSearch = new() { Width = 160 };
+        private readonly TextBox _priceFrom = new() { Width = 80 };
+
         public OrdersForm(MainForm main)
         {
             _main = main;
@@ -55,6 +58,10 @@ namespace AccessMasterDetail
             toolbar.Items.Add("Сохранить", null, (_, _) => _main.SaveAll());
 
             Controls.Add(_grid);
+            Controls.Add(Filters.Panel(
+                Filters.Label("Товар:"), _productSearch,
+                Filters.Label("Цена от:"), _priceFrom,
+                Filters.ClearButton(() => { _productSearch.Clear(); _priceFrom.Clear(); })));
             Controls.Add(_header);
             Controls.Add(_total);
             Controls.Add(toolbar);
@@ -62,14 +69,23 @@ namespace AccessMasterDetail
             main.ClientsBinding.CurrentChanged += OnClientChanged;
             _ordersBs.ListChanged += (_, _) => UpdateTotal();
             FormClosed += (_, _) => main.ClientsBinding.CurrentChanged -= OnClientChanged;
+            _productSearch.TextChanged += (_, _) => ApplyFilter();
+            _priceFrom.TextChanged += (_, _) => ApplyFilter();
 
             OnClientChanged(this, EventArgs.Empty);
         }
 
         public void EndEdit() => _ordersBs.EndEdit();
 
+        private void ApplyFilter()
+        {
+            _ordersBs.Filter = Filters.OrdersFilter(_productSearch.Text, _priceFrom);
+            UpdateTotal();
+        }
+
         private void OnClientChanged(object sender, EventArgs e)
         {
+            _ordersBs.Filter = Filters.OrdersFilter(_productSearch.Text, _priceFrom);
             _header.Text = _main.ClientsBinding.Current is DataRowView c
                 ? $"Клиент: {c["FullName"]}   ({c["City"]}, {c["Phone"]})"
                 : "Клиент не выбран";
