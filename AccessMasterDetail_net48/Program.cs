@@ -29,8 +29,7 @@ namespace AccessMasterDetail
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "Не удалось открыть/создать базу Access.\n\n" + ex.Message +
-                    "\n\nУстановите Microsoft Access Database Engine (или Microsoft Office с Access).",
+                    "Не удалось открыть/создать базу Access.\n\n" + ex.Message,
                     "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
@@ -43,32 +42,65 @@ namespace AccessMasterDetail
     {
         public const string RelationName = "FK_Clients_Orders";
 
-        // Ищем доступный драйвер Access: ACE (.accdb) из Office, иначе встроенный в Windows Jet (.mdb).
-        private static readonly string Provider = DetectProvider();
+        // Драйверы Access по порядку: ACE из Office (.accdb), затем встроенный в Windows Jet (.mdb).
+        private static readonly string[] Providers =
+            { "Microsoft.ACE.OLEDB.16.0", "Microsoft.ACE.OLEDB.12.0", "Microsoft.Jet.OLEDB.4.0" };
 
-        public static readonly string DbPath = Path.Combine(AppContext.BaseDirectory,
-            Provider.StartsWith("Microsoft.Jet") ? "Shop.mdb" : "Shop.accdb");
+        private static string Provider = Providers[0];
+        private static bool IsJet => Provider.StartsWith("Microsoft.Jet");
+
+        public static string DbPath => Path.Combine(AppContext.BaseDirectory, IsJet ? "Shop.mdb" : "Shop.accdb");
 
         public static string ConnectionString =>
             $"Provider={Provider};Data Source={DbPath};Persist Security Info=False;" +
-            (Provider.StartsWith("Microsoft.Jet") ? "Jet OLEDB:Engine Type=5;" : "");
+            (IsJet ? "Jet OLEDB:Engine Type=5;" : "");
 
-        private static string DetectProvider()
-        {
-            foreach (var p in new[] { "Microsoft.ACE.OLEDB.16.0", "Microsoft.ACE.OLEDB.12.0", "Microsoft.Jet.OLEDB.4.0" })
-            {
-                using (var key = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(p + "\\CLSID"))
-                    if (key != null) return p;
-            }
-            return "Microsoft.ACE.OLEDB.12.0";
-        }
-
-        /// <summary>Создаёт файл базы с таблицами и тестовыми данными, если его ещё нет.</summary>
+        /// <summary>Находит рабочий драйвер и открывает (или создаёт) базу.</summary>
         public static void EnsureDatabase()
         {
-            if (File.Exists(DbPath)) return;
+            var errors = new System.Text.StringBuilder();
 
-            // Пустой .accdb создаём через ADOX (COM), таблицы — через SQL DDL.
+            // 1. Если база уже есть — ищем драйвер, который её открывает.
+            foreach (var p in Providers)
+            {
+                Provider = p;
+                if (!File.Exists(DbPath)) continue;
+                try
+                {
+                    using (var c = new OleDbConnection(ConnectionString)) c.Open();
+                    return;
+                }
+                catch (Exception ex) { errors.AppendLine(p + ": " + Inner(ex).Message); }
+            }
+
+            // 2. Иначе создаём новую базу первым драйвером, который сработает.
+            foreach (var p in Providers)
+            {
+                Provider = p;
+                if (File.Exists(DbPath)) continue;
+                try
+                {
+                    CreateDatabase();
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    errors.AppendLine(p + ": " + Inner(ex).Message);
+                    try { if (File.Exists(DbPath)) File.Delete(DbPath); } catch { }
+                }
+            }
+            throw new InvalidOperationException(errors.ToString());
+        }
+
+        private static Exception Inner(Exception ex)
+        {
+            while (ex.InnerException != null) ex = ex.InnerException;
+            return ex;
+        }
+
+        private static void CreateDatabase()
+        {
+            // Пустой файл базы создаём через ADOX (COM), таблицы — через SQL DDL.
             Type catalogType = Type.GetTypeFromProgID("ADOX.Catalog")
                 ?? throw new InvalidOperationException("ADOX.Catalog не найден.");
             object catalog = Activator.CreateInstance(catalogType);
